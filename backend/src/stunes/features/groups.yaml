@@ -1,0 +1,37 @@
+# Feature groups. Adding a group is a spec change, not a code change:
+# `source: table` groups are read from the feature table as-is; `source: compute:<name>`
+# groups are computed on a cache miss by the named SQL in features/compute.py.
+feature_groups:
+  - name: user_recent_plays   # last 50 plays [[song_id, ts], ...], newest first; written by the consumer
+    entity: user
+    ttl_sec: 3600
+    source: table
+    write: through            # consumer: Postgres upsert, then Redis set
+
+  - name: user_tag_pref       # {tag: weight}, recent plays x song tags with time decay
+    entity: user
+    ttl_sec: 3600
+    source: compute:user_tag_pref
+
+  - name: song_stats          # {plays, skips, likes} counters
+    entity: song
+    ttl_sec: 300
+    source: compute:song_stats
+    write: around             # high cardinality, rarely read: consumer invalidates, reads refill
+
+  - name: song_llm_tags       # Phase 4: LLM-predicted mood/situation tags with confidence
+    entity: song
+    ttl_sec: 86400
+    source: table
+
+  - name: song_rerank         # re-ranker per-song stats: title, artists, album, genres, tags,
+    entity: song              # tag_weights, playlist_count, top-5 playlist titles, year
+    ttl_sec: 3600             # (stunes rerank serve-stats loads it from the song export)
+    source: table
+    write: around
+
+  - name: tag_songs           # re-ranker tag source: a tag's songs by popularity, top 1000
+    entity: tag               # [[song_id, playlist_count], ...] (stunes rerank serve-stats)
+    ttl_sec: 3600
+    source: table
+    write: around

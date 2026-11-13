@@ -1,0 +1,59 @@
+# Graph store vs relational store on identical data (docs/results.md, "대화 검색의
+# 그래프 호출: 그래프 DB와 관계형 DB"). Runs on a host of its own, not next to the served stack.
+# Both stores get the same CPU and memory limits; each holds the whole topology in its cache.
+name: stunes-bench
+
+services:
+  neo4j:
+    image: neo4j:2026.10.1-community
+    environment:
+      NEO4J_AUTH: neo4j/${BENCH_PASSWORD:?set BENCH_PASSWORD}
+      NEO4J_server_memory_heap_initial__size: 2g
+      NEO4J_server_memory_heap_max__size: 2g
+      NEO4J_server_memory_pagecache_size: 4g
+    volumes:
+      - neo4j_data:/data
+      - ./data:/import:ro
+    cpus: 4
+    mem_limit: 8g
+
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg18-trixie
+    command:
+      - postgres
+      - -c
+      - shared_buffers=4GB
+      - -c
+      - effective_cache_size=6GB
+      - -c
+      - work_mem=64MB
+      - -c
+      - maintenance_work_mem=1GB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - jit=off
+    shm_size: 1gb
+    environment:
+      POSTGRES_USER: bench
+      POSTGRES_PASSWORD: ${BENCH_PASSWORD:?set BENCH_PASSWORD}
+      POSTGRES_DB: bench
+    volumes:
+      - pg_data:/var/lib/postgresql
+      - ./data:/import:ro
+      - ./sql:/sql:ro
+    cpus: 4
+    mem_limit: 8g
+
+  runner:
+    image: python:3.12.12-slim
+    profiles: [run]
+    working_dir: /bench
+    volumes:
+      - ./:/bench
+    cpus: 2
+    mem_limit: 2g
+
+volumes:
+  neo4j_data:
+  pg_data:

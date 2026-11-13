@@ -1,0 +1,58 @@
+groups:
+  - name: stunes-data-quality
+    rules:
+      - alert: QualityCheckFailing
+        expr: stunes_quality_ok == 0
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "data-quality check {{ $labels.check }} failing (value {{ $value }})"
+
+      - alert: QualityChecksStale
+        expr: time() - stunes_quality_last_run_timestamp > 300
+        labels: { severity: warning }
+        annotations: { summary: "quality checker hasn't run for 5 minutes" }
+
+      - alert: DeadLetterRateHigh
+        expr: |
+          sum(rate(stunes_ingest_events_total{outcome="dlq"}[5m]))
+            / clamp_min(sum(rate(stunes_ingest_events_total{outcome=~"ok|duplicate"}[5m])), 1e-9) > 0.02
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "more than 2% of events dead-lettered (schema drift upstream?)" }
+
+      - alert: IngestionLagHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(stunes_feature_freshness_seconds_bucket[5m]))) > 30
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "p95 event -> feature lag above 30 s" }
+
+  - name: stunes-recommendation-quality
+    rules:
+      - alert: ChatLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(stunes_chat_seconds_bucket{strategy="hybrid"}[5m]))) > 15
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "hybrid p95 latency above 15 s" }
+
+      - alert: EmptyResultsRateHigh
+        expr: |
+          sum(rate(stunes_empty_results_total{strategy="hybrid"}[10m]))
+            / clamp_min(sum(rate(stunes_chat_seconds_count{strategy="hybrid"}[10m])), 1e-9) > 0.2
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "over 20% of turns return nothing" }
+
+      - alert: PopularityBiasHigh
+        expr: |
+          sum(rate(stunes_recommended_total{bucket="head"}[30m]))
+            / clamp_min(sum(rate(stunes_recommended_total[30m])), 1e-9) > 0.8
+        for: 10m
+        labels: { severity: info }
+        annotations: { summary: "over 80% of shown songs are head songs (1000+ playlists)" }
+
+      - alert: RetrievalSourceFailing
+        expr: sum by (component) (rate(stunes_errors_total{component=~"source_.*"}[5m])) > 0
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.component }} is failing; results come from the other sources" }

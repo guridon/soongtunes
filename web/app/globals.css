@@ -1,0 +1,109 @@
+@import "tailwindcss";
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+
+/* FigJam-like board: warm gray canvas, dotted grid, flat sticky colors, soft shadows. */
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui,
+    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+
+  --color-canvas: #f3f2ef;
+  --color-dot: #cfcdc6;
+  --color-ink: #1e1e1e;
+  --color-ink-2: #55534e;
+  --color-ink-3: #8a877f;
+  --color-line: #e2e0da;
+  --color-paper: #ffffff;
+  --color-accent: #7b5cff;
+  --color-accent-soft: #ece7ff;
+
+  --color-yellow: #ffe68f;
+  --color-green: #b9efca;
+  --color-pink: #ffc9db;
+  --color-blue: #c7dcff;
+  --color-violet: #dfd0ff;
+  --color-orange: #ffd5ad;
+  --color-teal: #bdeee8;
+  --color-gray: #e9e7e2;
+
+  --color-yellow-ink: #6b5200;
+  --color-green-ink: #145c33;
+  --color-pink-ink: #8a1f47;
+  --color-blue-ink: #173f8a;
+  --color-violet-ink: #4b2aa8;
+  --color-orange-ink: #8a4300;
+  --color-teal-ink: #0e5a52;
+
+  --shadow-sticky: 0 1px 1px rgb(0 0 0 / 0.06), 0 6px 14px -4px rgb(0 0 0 / 0.16);
+  --shadow-float: 0 2px 6px rgb(0 0 0 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.18);
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.dot-grid {
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(var(--color-dot) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+/* React Flow: blend into the board */
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__edge-path {
+  stroke: #9a978e;
+  stroke-width: 1.6;
+}
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke: var(--color-accent);
+}
+.react-flow__edge-textbg {
+  fill: var(--color-paper);
+}
+.react-flow__node {
+  cursor: default;
+}
+.react-flow__controls {
+  box-shadow: var(--shadow-float);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pop-in {
+  animation: pop-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+.typing span {
+  animation: blink 1s infinite;
+}
+.typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}

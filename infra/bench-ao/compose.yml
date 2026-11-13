@@ -1,0 +1,120 @@
+# auto-ontology (NVIDIA, commit eb8dd0621d, 2026-10-25) as an external baseline for the
+# SoongTunes context set. Derived from its docker-compose.yml: ports bound to 127.0.0.1 (its
+# backend and ingestion endpoints have no auth of their own), pgAdmin left out, pinned
+# Postgres image, and an llm-proxy in front of the SoongTunes vLLM on the GPU server.
+name: stunes-ao
+
+x-ao: &ao
+  image: stunes-ao-backend:eb8dd06
+  pull_policy: never
+  env_file: [.env]
+  mem_limit: 10g  # a broad query's rows (~100 MB of JSON) are copied several times per request
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DATABASE}
+    command: ["postgres", "-c", "shared_buffers=2GB", "-c", "work_mem=64MB",
+              "-c", "maintenance_work_mem=1GB", "-c", "jit=off",
+              "-c", "max_connections=300"]  # 100 ran out when the backend restarted
+    shm_size: 1gb
+    mem_limit: 6g
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./data:/import:ro
+      - ./sql:/sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DATABASE}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  llm-proxy:
+    image: python:3.12.12-slim
+    command: ["python", "-u", "/app/proxy.py"]
+    volumes: ["./proxy:/app:ro"]
+    env_file: [proxy.env]
+    mem_limit: 512m
+
+  auto-ontology-migrate:
+    <<: *ao
+    build:
+      context: ./auto-ontology
+      dockerfile: Dockerfile
+    pull_policy: build
+    environment: {POSTGRES_HOST: postgres, POSTGRES_PORT: "5432"}
+    command: ["migrate"]
+    restart: "no"
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  ingestion-service:
+    <<: *ao
+    command: ["ingestion_service"]
+    restart: unless-stopped
+    healthcheck:  # as in the upstream compose: the image's own check probes :3001
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3002/health/live', timeout=3).status == 200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    environment: {POSTGRES_HOST: postgres, POSTGRES_PORT: "5432"}
+    depends_on:
+      postgres: {condition: service_started}
+      llm-proxy: {condition: service_started}
+      auto-ontology-migrate: {condition: service_completed_successfully}
+
+  auto-ontology:
+    <<: *ao
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      INGESTION_SERVICE_URL: http://ingestion-service:3002
+    depends_on:
+      postgres: {condition: service_started}
+      llm-proxy: {condition: service_started}
+      auto-ontology-migrate: {condition: service_completed_successfully}
+      ingestion-service: {condition: service_started}
+
+  frontend-migrate:
+    build:
+      context: ./auto-ontology/frontend
+      args: {PYTHON_API_URL: "http://auto-ontology:3001"}
+    image: stunes-ao-frontend:eb8dd06
+    working_dir: /app/migrate
+    env_file: [.env]
+    environment: {POSTGRES_HOST: postgres, POSTGRES_PORT: "5432"}
+    command: ["sh", "prisma/migrate.sh"]
+    restart: "no"
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  auto-ontology-frontend:
+    image: stunes-ao-frontend:eb8dd06
+    pull_policy: never
+    restart: unless-stopped
+    ports: ["127.0.0.1:13000:3000"]
+    env_file: [.env]
+    environment:
+      PYTHON_API_URL: http://auto-ontology:3001
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+    mem_limit: 3g  # Next.js sat at 1.4 GiB with two requests in flight
+    depends_on:
+      auto-ontology: {condition: service_healthy}
+      frontend-migrate: {condition: service_completed_successfully}
+
+  runner:
+    build: ./runner
+    image: stunes-ao-runner:1
+    profiles: [run]
+    env_file: [.env]
+    volumes: ["./runner:/work", "./sets:/sets:ro", "./out:/out"]
+    mem_limit: 6g  # a result row stream can be ~100 MB of JSON per turn
+
+volumes:
+  pg_data:

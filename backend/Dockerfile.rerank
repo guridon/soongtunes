@@ -1,0 +1,19 @@
+# Re-ranker training (stunes rerank train). LightGBM needs OpenMP: on macOS that is a Homebrew
+# libomp, here Debian's libgomp1. The API image does not carry either.
+FROM python:3.13-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/astral-sh/uv:0.9.24 /uv /usr/local/bin/uv
+WORKDIR /app
+
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-dev --group rerank --no-install-project
+COPY src ./src
+RUN uv sync --frozen --no-dev --group rerank
+
+ENV PATH="/app/.venv/bin:$PATH" DATA_DIR=/data RESULTS_DIR=/results
+RUN useradd --system --uid 10001 app && chown -R app /app
+USER app
+ENTRYPOINT ["stunes", "rerank"]
+CMD ["train"]

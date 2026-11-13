@@ -1,0 +1,6 @@
+apiVersion: 1
+providers:
+  - name: stunes
+    folder: SoongTunes
+    type: file
+    options: { path: /var/lib/grafana/dashboards }

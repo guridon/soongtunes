@@ -1,0 +1,73 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+# Python packaging dirs, anchored: a bare `lib/` also hid web/lib (the web app didn't build from a clone)
+/backend/lib/
+/backend/lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+
+# Databases
+*.db
+*.sqlite3
+
+# IDE / Editor
+.idea/
+.vscode/
+.spyderproject
+.ropeproject
+
+# macOS
+.DS_Store
+# v2
+.data/
+results/eval/**/predictions.jsonl
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
